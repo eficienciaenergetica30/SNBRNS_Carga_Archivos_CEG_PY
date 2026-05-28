@@ -58,7 +58,7 @@
 
         <div class="d-grid gap-2 d-md-flex justify-content-md-end mb-3">
             <button type="button" class="btn btn-success btn-lg floating-save-btn" id="btnGuardar">
-                💾 Guardar datos
+                Guardar datos
             </button>
         </div>
         {% endif %}
@@ -67,13 +67,8 @@
             <div class="card-body">
                 <form action="/" method="post" enctype="multipart/form-data" id="uploadForm">
                     <div class="row g-3 align-items-center">
-                        <div class="col-md-8">
-                            <input type="file" name="file" class="form-control" required accept=".xlsx,.xls">
-                        </div>
-                        <div class="col-md-4 d-grid">
-                            <button type="submit" class="btn btn-primary">
-                                📊 Mostrar información
-                            </button>
+                        <div class="col-12">
+                            <input type="file" name="file" id="fileInput" class="form-control" required accept=".xlsx,.xls">
                         </div>
                     </div>
                 </form>
@@ -117,6 +112,18 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', function () {
+
+            // Auto-submit al cambiar el archivo
+            const fileInput = document.getElementById('fileInput');
+            const uploadForm = document.getElementById('uploadForm');
+
+            if (fileInput) {
+                fileInput.addEventListener('change', function () {
+                    if (fileInput.files.length > 0) {
+                        uploadForm.submit();
+                    }
+                });
+            }
 
             // 1. DETECCIÓN DE ERRORES DESDE EL BACKEND (Jinja2)
             {% if error %}

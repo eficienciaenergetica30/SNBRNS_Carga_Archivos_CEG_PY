@@ -198,3 +198,22 @@ def preparar_datos_para_bd(resultados):
     datos_para_bd = list(df_final.itertuples(index=False, name=None))
 
     return datos_para_bd
+
+
+def get_sysuuid():
+    """
+    Genera un UUID único consultando SYSUUID de HANA.
+    Retorna el UUID como string.
+    """
+    conn = get_hana_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT SYSUUID FROM DUMMY")
+        row = cursor.fetchone()
+        cursor.close()
+        val = row[0]
+        if isinstance(val, (bytes, bytearray, memoryview)):
+            return bytes(val).hex().upper()
+        return str(val).replace("-", "").upper()
+    finally:
+        conn.close()

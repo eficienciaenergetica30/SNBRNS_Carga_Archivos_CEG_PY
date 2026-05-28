@@ -344,16 +344,26 @@ def guardar_datos():
             return jsonify({"success": False, "message": mensaje_bd})
 
         # ==============================================================================
-        # 4. LLAMADA AL SERVICIO EXTERNO (Tu código nuevo)
+        # 4. LLAMADA AL SERVICIO EXTERNO
         # ==============================================================================
         service_url = "https://snbrns-processes-hub-noisy-baboon-ll.cfapps.us10.hana.ondemand.com/snbrns-hub/hana/procedures/sp-snbrs-03"
+        # service_url = "http://127.0.0.1:8000/snbrns-hub/hana/procedures/sp-snbrs-03"
         logging.info(f"Iniciando llamada al servicio: {service_url}")
 
         backend_success = False
         backend_message = ""
 
         try:
-            payload = {"param1": 0, "param2": "trigger_automatico"}
+            rows_read = int(len(df)) if df is not None else 0
+            rows_inserted_init = int(len(datos_para_insertar))
+            execution_id_in = db.get_sysuuid()
+
+            payload = {
+                "rows_read": rows_read,
+                "rows_inserted_init": rows_inserted_init,
+                "execution_id_in": execution_id_in,
+                "user": "CEG_USER",
+            }
             response = requests.post(service_url, json=payload, timeout=300)
 
             if response.status_code in [200, 201]:
