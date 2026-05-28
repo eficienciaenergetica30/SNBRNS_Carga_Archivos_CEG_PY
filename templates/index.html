@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload CEG</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css" rel="stylesheet">
+
+    <style>
+        table th {
+            text-align: center !important;
+            vertical-align: middle !important;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            font-size: 0.9rem;
+        }
+
+        table td {
+            text-align: center !important;
+            vertical-align: middle !important;
+            white-space: nowrap;
+        }
+
+        .floating-save-btn {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            z-index: 1050;
+            border-radius: 50px;
+            padding: 12px 20px;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+            transition: transform 0.2s;
+        }
+
+        .floating-save-btn:hover {
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+
+<body class="bg-light">
+
+    <div class="container py-5">
+
+        <div class="text-center mb-4">
+            <h1 class="fw-bold">Carga CEG</h1>
+            <p class="text-muted">Carga un archivo Excel y visualiza la información</p>
+        </div>
+
+        {% if data %}
+        {% if filename %}
+        <input type="hidden" id="tempFilename" value="{{ filename }}">
+        {% endif %}
+
+        <div class="d-grid gap-2 d-md-flex justify-content-md-end mb-3">
+            <button type="button" class="btn btn-success btn-lg floating-save-btn" id="btnGuardar">
+                💾 Guardar datos
+            </button>
+        </div>
+        {% endif %}
+
+        <div class="card shadow-sm mb-5">
+            <div class="card-body">
+                <form action="/" method="post" enctype="multipart/form-data" id="uploadForm">
+                    <div class="row g-3 align-items-center">
+                        <div class="col-md-8">
+                            <input type="file" name="file" class="form-control" required accept=".xlsx,.xls">
+                        </div>
+                        <div class="col-md-4 d-grid">
+                            <button type="submit" class="btn btn-primary">
+                                📊 Mostrar información
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        {% if data %}
+        <h2 class="mb-4">Resultados del Proceso</h2>
+
+        <div class="card mb-4 shadow-sm border-primary">
+            <div class="card-body">
+                <h5 class="card-title text-primary">📅 Periodo Encontrado</h5>
+                <p class="display-6 fw-bold text-dark mb-0">
+                    {{ data['fecha_facturacion'] }}
+                </p>
+            </div>
+        </div>
+
+        {% if data['detalle_energia_porteada'] is not none %}
+        <div class="card mb-4 shadow-sm">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">📄 Detalle de Facturación</h5>
+            </div>
+            <div class="card-body table-responsive">
+                {{ data['detalle_energia_porteada'].to_html(classes="table table-sm table-striped table-bordered",
+                index=False) | safe }}
+            </div>
+        </div>
+        {% else %}
+        <div class="alert alert-warning">
+            ⚠️ No se encontró la hoja de "Detalle de Facturación" en el archivo.
+        </div>
+        {% endif %}
+
+        {% endif %}
+
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+
+            // 1. DETECCIÓN DE ERRORES DESDE EL BACKEND (Jinja2)
+            {% if error %}
+            Swal.fire({
+                icon: 'error',
+                title: 'Error procesando el archivo',
+                text: '{{ error }}',
+                footer: 'Revisa que el archivo no esté abierto en Excel'
+            });
+            {% endif %}
+
+            const btnGuardar = document.getElementById('btnGuardar');
+
+            if (btnGuardar) {
+                btnGuardar.addEventListener('click', function () {
+                    
+                    // CAMBIO 2: Verificar que tenemos el filename antes de intentar guardar
+                    const filenameInput = document.getElementById('tempFilename');
+                    if (!filenameInput || !filenameInput.value) {
+                        Swal.fire('Error', 'No se encontró la referencia del archivo. Por favor cárgalo de nuevo.', 'error');
+                        return;
+                    }
+
+                    Swal.fire({
+                        title: '¿Estás seguro?',
+                        text: "Se guardarán los datos en BD y se disparará el proceso automático.",
+                        icon: 'question',
+                        showCancelButton: true,
+                        confirmButtonColor: '#198754',
+                        cancelButtonColor: '#6c757d',
+                        confirmButtonText: 'Sí, guardar',
+                        cancelButtonText: 'Cancelar'
+                    }).then((result) => {
+                        if (result.isConfirmed) {
+                            // Pasamos el valor del filename a la función
+                            ejecutarGuardado(filenameInput.value);
+                        }
+                    });
+                });
+            }
+
+            async function ejecutarGuardado(filename) {
+                const btnGuardar = document.getElementById('btnGuardar');
+                const textoOriginal = btnGuardar.innerHTML;
+
+                // Bloquear botón y mostrar spinner
+                btnGuardar.disabled = true;
+                btnGuardar.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Procesando...';
+
+                try {
+                    // CAMBIO 3: Enviar el filename en el body del POST
+                    const response = await fetch('/guardar', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ filename: filename }) 
+                    });
+
+                    const result = await response.json();
+
+                    if (result.success) {
+                        
+                        // CAMBIO 4: Manejar el Warning (Amarillo) vs Éxito Total (Verde)
+                        if (result.warning) {
+                            // Caso: BD OK, pero Servicio Falló
+                            Swal.fire({
+                                icon: 'warning',
+                                title: 'Guardado con Advertencia',
+                                text: result.message,
+                                confirmButtonText: 'Entendido'
+                            }).then(() => {
+                                // Aquí decidimos si recargar o dejar que el usuario vea la tabla
+                                window.location.href = "/"; 
+                            });
+                        } else {
+                            // Caso: Todo Perfecto
+                            Swal.fire({
+                                icon: 'success',
+                                title: '¡Proceso Exitoso!',
+                                text: result.message,
+                                timer: 4000,
+                                showConfirmButton: false
+                            }).then(() => {
+                                window.location.href = "/";
+                            });
+                        }
+
+                    } else {
+                        // Error reportado por el backend
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error al guardar',
+                            text: result.message
+                        });
+                        restaurarBoton(btnGuardar, textoOriginal);
+                    }
+
+                } catch (error) {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error de conexión',
+                        text: 'No se pudo contactar con el servidor. ' + error.message
+                    });
+                    restaurarBoton(btnGuardar, textoOriginal);
+                }
+            }
+
+            function restaurarBoton(btn, texto) {
+                btn.innerHTML = texto;
+                btn.disabled = false;
+            }
+        });
+    </script>
+
+</body>
+
+</html>
